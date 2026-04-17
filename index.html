@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Platform</title>
+
+<style>
+body {
+    font-family: Arial;
+    margin: 0;
+    background: #f4f4f4;
+}
+
+header {
+    background: #333;
+    color: white;
+    padding: 15px;
+    text-align: center;
+}
+
+nav button {
+    margin: 5px;
+    padding: 10px;
+    border: none;
+    background: #007BFF;
+    color: white;
+    cursor: pointer;
+}
+
+.container {
+    padding: 20px;
+}
+
+.hidden {
+    display: none;
+}
+
+.card {
+    background: white;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+}
+
+input, button {
+    margin: 5px 0;
+    padding: 8px;
+    width: 100%;
+}
+
+.quiz-option {
+    background: #eee;
+    padding: 10px;
+    margin: 5px 0;
+    cursor: pointer;
+}
+
+.correct { background: lightgreen; }
+.wrong { background: pink; }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>Online Quiz Maker</h1>
+    <nav>
+        <button onclick="showSection('home')">Home</button>
+        <button onclick="showSection('create')">Create Quiz</button>
+        <button onclick="showSection('list')">Take Quiz</button>
+        <button onclick="showSection('auth')">Login/Register</button>
+    </nav>
+</header>
+
+<div class="container">
+
+<!-- HOME -->
+<div id="home">
+    <h2>Welcome 🎯</h2>
+    <p>Create quizzes or test your knowledge!</p>
+</div>
+
+<!-- AUTH -->
+<div id="auth" class="hidden">
+    <h2>Login / Register</h2>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <p id="authMsg"></p>
+</div>
+
+<!-- CREATE QUIZ -->
+<div id="create" class="hidden">
+    <h2>Create Quiz</h2>
+    <input id="quizTitle" placeholder="Quiz Title">
+
+    <div id="questions"></div>
+
+    <button onclick="addQuestion()">Add Question</button>
+    <button onclick="saveQuiz()">Save Quiz</button>
+</div>
+
+<!-- QUIZ LIST -->
+<div id="list" class="hidden">
+    <h2>Available Quizzes</h2>
+    <div id="quizList"></div>
+</div>
+
+<!-- TAKE QUIZ -->
+<div id="quiz" class="hidden">
+    <h2 id="quizName"></h2>
+    <div id="quizContainer"></div>
+    <button onclick="submitQuiz()">Submit</button>
+</div>
+
+<!-- RESULT -->
+<div id="result" class="hidden">
+    <h2>Result</h2>
+    <p id="score"></p>
+</div>
+
+</div>
+
+<script>
+let quizzes = JSON.parse(localStorage.getItem("quizzes")) || [];
+let currentQuiz = null;
+let answers = [];
+
+// Navigation
+function showSection(id) {
+    document.querySelectorAll(".container > div").forEach(div => div.classList.add("hidden"));
+    document.getElementById(id).classList.remove("hidden");
+
+    if (id === "list") loadQuizzes();
+}
+
+// AUTH
+function register() {
+    localStorage.setItem("user", JSON.stringify({
+        username: username.value,
+        password: password.value
+    }));
+    authMsg.innerText = "Registered!";
+}
+
+function login() {
+    let user = JSON.parse(localStorage.getItem("user"));
+    if (user && user.username === username.value && user.password === password.value) {
+        authMsg.innerText = "Login successful!";
+    } else {
+        authMsg.innerText = "Invalid credentials";
+    }
+}
+
+// CREATE QUIZ
+function addQuestion() {
+    let div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+        <input placeholder="Question">
+        <input placeholder="Option 1">
+        <input placeholder="Option 2">
+        <input placeholder="Option 3">
+        <input placeholder="Option 4">
+        <input placeholder="Correct Answer (1-4)">
+    `;
+
+    questions.appendChild(div);
+}
+
+function saveQuiz() {
+    let quiz = {
+        title: quizTitle.value,
+        questions: []
+    };
+
+    document.querySelectorAll("#questions .card").forEach(card => {
+        let inputs = card.querySelectorAll("input");
+        quiz.questions.push({
+            q: inputs[0].value,
+            options: [
+                inputs[1].value,
+                inputs[2].value,
+                inputs[3].value,
+                inputs[4].value
+            ],
+            correct: inputs[5].value - 1
+        });
+    });
+
+    quizzes.push(quiz);
+    localStorage.setItem("quizzes", JSON.stringify(quizzes));
+
+    alert("Quiz Saved!");
+}
+
+// LOAD QUIZZES
+function loadQuizzes() {
+    quizList.innerHTML = "";
+
+    quizzes.forEach((quiz, index) => {
+        let div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `
+            <h3>${quiz.title}</h3>
+            <button onclick="startQuiz(${index})">Start</button>
+        `;
+        quizList.appendChild(div);
+    });
+}
+
+// START QUIZ
+function startQuiz(index) {
+    currentQuiz = quizzes[index];
+    answers = [];
+    showSection("quiz");
+
+    quizName.innerText = currentQuiz.title;
+    quizContainer.innerHTML = "";
+
+    currentQuiz.questions.forEach((q, i) => {
+        let div = document.createElement("div");
+        div.className = "card";
+
+        let optionsHTML = "";
+        q.options.forEach((opt, j) => {
+            optionsHTML += `
+                <div class="quiz-option" onclick="selectAnswer(${i}, ${j}, this)">
+                    ${opt}
+                </div>
+            `;
+        });
+
+        div.innerHTML = `<p>${q.q}</p>${optionsHTML}`;
+        quizContainer.appendChild(div);
+    });
+}
+
+// SELECT ANSWER
+function selectAnswer(qIndex, optIndex, el) {
+    answers[qIndex] = optIndex;
+
+    let options = el.parentElement.querySelectorAll(".quiz-option");
+    options.forEach(o => o.style.background = "#eee");
+
+    el.style.background = "#add8e6";
+}
+
+// SUBMIT QUIZ
+function submitQuiz() {
+    let scoreCount = 0;
+
+    currentQuiz.questions.forEach((q, i) => {
+        if (answers[i] == q.correct) scoreCount++;
+    });
+
+    showSection("result");
+    score.innerText = `Score: ${scoreCount} / ${currentQuiz.questions.length}`;
+}
+</script>
+
+</body>
+</html>
